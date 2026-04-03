@@ -1,26 +1,25 @@
 const express = require('express');
-const tasksRouter = require('./tasks.router');
+const helmet = require('helmet');
+const cors = require('cors');
+const taskRoutes = require('./routes/taskRoutes');
+const { errorHandler } = require('./middleware/errorHandler');
 
 const app = express();
 
+app.use(helmet());
+app.use(cors());
 app.use(express.json());
 
-// Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-app.use('/tasks', tasksRouter);
+app.use('/api/v1/tasks', taskRoutes);
 
-// 404 handler
 app.use((req, res) => {
-  res.status(404).json({ error: 'Not found' });
+  res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Not found' } });
 });
 
-// Error handler
-app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(500).json({ error: 'Internal server error' });
-});
+app.use(errorHandler);
 
 module.exports = app;

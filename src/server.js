@@ -1,7 +1,9 @@
 const app = require('./app');
+const { runMigrations } = require('./db/migrate');
+const config = require('./config/env');
 
-const PORT = process.env.PORT || 3000;
+runMigrations();
 
-app.listen(PORT, () => {
-  console.log(`Task Tracker API listening on port ${PORT}`);
+app.listen(config.port, () => {
+  console.log(`Task Tracker API listening on port ${config.port}`);
 });
