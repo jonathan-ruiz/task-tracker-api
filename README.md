@@ -288,7 +288,7 @@ Each criterion below lists the exact test(s) that prove it. All tests run with `
 
 ## Test Run Evidence
 
-Last full run — `NODE_ENV=test npm test -- --verbose`:
+Last full run — `NODE_ENV=test npm test -- --verbose` (2026-04-04, commit `da7f9f9`):
 
 ```
 PASS tests/integration/taskRoutes.test.js
