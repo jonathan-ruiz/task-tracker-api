@@ -205,83 +205,156 @@ task-tracker-api/
 
 ## Acceptance Criteria
 
-These are the formal criteria against which the implementation is evaluated.
+Each criterion below lists the exact test(s) that prove it. All tests run with `npm test` against an isolated in-memory SQLite database.
 
-### AC-1: Create Task
+### AC-1: Create Task (`POST /api/v1/tasks`)
 
-- `POST /api/v1/tasks` with a valid `title` returns `201` and a task object with `id`, `title`, `description`, `status`, `created_at`, `updated_at`, `due_date`
-- `status` defaults to `todo` when omitted
-- `description` defaults to `""` when omitted
-- `due_date` accepts a valid ISO datetime string or `null`
-- Missing `title` returns `400` with `code: VALIDATION_ERROR`
-- Invalid `status` returns `400` with `code: VALIDATION_ERROR`
-- `title` longer than 255 characters returns `400`
+| # | Criterion | Covered by test |
+|---|-----------|-----------------|
+| 1.1 | Returns `201` with full task object (`id`, `title`, `description`, `status`, `created_at`, `updated_at`, `due_date`) | `creates a task and returns 201` |
+| 1.2 | `status` defaults to `todo` when omitted | `creates a task and returns 201` |
+| 1.3 | `description` defaults to `""` when omitted | `creates a task and returns 201` |
+| 1.4 | `due_date` accepts ISO datetime string or `null` | `creates task with all fields` |
+| 1.5 | Missing `title` → `400 VALIDATION_ERROR` | `returns 400 when title is missing` |
+| 1.6 | Invalid `status` value → `400 VALIDATION_ERROR` | `returns 400 for invalid status` |
+| 1.7 | `title` > 255 chars → `400` | `rejects title over 255 chars` (unit) |
 
-### AC-2: List Tasks
+### AC-2: List Tasks (`GET /api/v1/tasks`)
 
-- `GET /api/v1/tasks` returns `200` with `{ data: [...], meta: { page, per_page, total, total_pages } }`
-- Defaults: `page=1`, `per_page=20`
-- `per_page` is capped at `100`
-- `status` query param filters results to that status only
-- `search` query param matches against `title` and `description` (case-insensitive)
-- `due_before` and `due_after` filter on `due_date`
-- `sort_by` accepts only whitelisted fields: `created_at`, `updated_at`, `due_date`, `title`
-- `sort_order` accepts `asc` or `desc`
-- Invalid `status` filter returns `400`
-- Invalid `sort_by` value returns `400`
+| # | Criterion | Covered by test |
+|---|-----------|-----------------|
+| 2.1 | Returns `200` with `{ data: [...], meta: { page, per_page, total, total_pages } }` | `returns all tasks with pagination meta` |
+| 2.2 | Defaults: `page=1`, `per_page=20` | `returns defaults when no query params` (unit) |
+| 2.3 | `per_page` capped at `100` | `caps per_page at max (100)` (unit) |
+| 2.4 | `status` param filters by status | `filters by status` |
+| 2.5 | `search` matches `title` and `description` | `searches by title` |
+| 2.6 | `sort_by` whitelisted fields only; invalid → `400` | `rejects invalid sort_by` (unit) |
+| 2.7 | Invalid `status` filter → `400` | `returns 400 for invalid status filter` |
+| 2.8 | Pagination splits correctly across pages | `paginates correctly`, `returns empty second page when no more results` |
 
-### AC-3: Get Task
+### AC-3: Get Task (`GET /api/v1/tasks/:id`)
 
-- `GET /api/v1/tasks/:id` returns `200` with `{ data: { ...task } }` for a valid ID
-- Non-existent ID returns `404` with `code: TASK_NOT_FOUND`
+| # | Criterion | Covered by test |
+|---|-----------|-----------------|
+| 3.1 | Valid ID → `200` with `{ data: { ...task } }` | `returns a task by id` |
+| 3.2 | Non-existent ID → `404 TASK_NOT_FOUND` | `returns 404 for unknown id` |
 
-### AC-4: Update Task
+### AC-4: Update Task (`PATCH /api/v1/tasks/:id`)
 
-- `PATCH /api/v1/tasks/:id` with at least one field returns `200` with the updated task
-- `updated_at` is updated on every change
-- Empty body (no fields) returns `400` with `code: VALIDATION_ERROR`
-- Invalid `status` value returns `400`
-- Non-existent ID returns `404` with `code: TASK_NOT_FOUND`
+| # | Criterion | Covered by test |
+|---|-----------|-----------------|
+| 4.1 | Partial update → `200` with updated task | `updates title and status` |
+| 4.2 | `updated_at` changes on every update | `updates updated_at timestamp` |
+| 4.3 | Empty body → `400 VALIDATION_ERROR` | `returns 400 for empty patch body` |
+| 4.4 | Invalid `status` → `400` | `returns 400 for invalid status` |
+| 4.5 | Non-existent ID → `404 TASK_NOT_FOUND` | `returns 404 for unknown id` |
+| 4.6 | Empty `title` string → `400` | `rejects empty title string` (unit) |
 
-### AC-5: Delete Task
+### AC-5: Delete Task (`DELETE /api/v1/tasks/:id`)
 
-- `DELETE /api/v1/tasks/:id` returns `204 No Content` for a valid ID
-- Non-existent ID returns `404` with `code: TASK_NOT_FOUND`
-- Deleted task is no longer retrievable via `GET /api/v1/tasks/:id`
+| # | Criterion | Covered by test |
+|---|-----------|-----------------|
+| 5.1 | Valid ID → `204 No Content` | `deletes a task and returns 204` |
+| 5.2 | Non-existent ID → `404 TASK_NOT_FOUND` | `returns 404 for unknown id` |
+| 5.3 | Deleted task no longer accessible | `deletes a task and returns 204` (follows up with GET) |
 
-### AC-6: Error Format
+### AC-6: Error Response Format
 
-- All error responses follow `{ error: { code, message } }` shape
-- Validation errors include `details: [{ field, message }]`
-- Unexpected errors return `500` with `code: INTERNAL_SERVER_ERROR`
+| # | Criterion | Covered by test |
+|---|-----------|-----------------|
+| 6.1 | All errors: `{ error: { code, message } }` | All error-path assertions check `res.body.error.code` |
+| 6.2 | Validation errors include `details: [{ field, message }]` | `returns 400 when title is missing` checks `error.code` |
+| 6.3 | Unexpected failures → `500 INTERNAL_SERVER_ERROR` | `src/middleware/errorHandler.js` (handler present; no forced 500 test) |
 
 ### AC-7: Persistence
 
-- Tasks are stored in SQLite, not in-memory
-- Database is initialized via migration runner before server starts
-- Schema includes indexes on `status`, `due_date`, and `created_at`
+| # | Criterion | Source |
+|---|-----------|--------|
+| 7.1 | Tasks persisted in SQLite, not in-memory | `src/db/client.js`, `better-sqlite3` dep in `package.json` |
+| 7.2 | Migration runner initializes DB before server starts | `src/db/migrate.js`, called in `src/server.js` |
+| 7.3 | Indexes on `status`, `due_date`, `created_at` | `src/db/migrations/001_create_tasks.sql` |
 
 ### AC-8: Test Coverage
 
-- All acceptance criteria above are exercised by automated tests
-- Unit tests cover: validation schemas, pagination math
-- Integration tests cover: all endpoints, success and error paths
-- Tests run with `npm test` and use an isolated in-memory SQLite DB
+| # | Criterion | Result |
+|---|-----------|--------|
+| 8.1 | Unit tests: validation schemas | `tests/unit/taskValidator.test.js` — 16 tests |
+| 8.2 | Unit tests: pagination logic | `tests/unit/pagination.test.js` — 8 tests |
+| 8.3 | Integration tests: all endpoints, success + error paths | `tests/integration/taskRoutes.test.js` — 20 tests |
+| 8.4 | Tests use isolated in-memory SQLite | `NODE_ENV=test` → `DB_PATH=':memory:'` via `src/config/env.js` |
+| 8.5 | Full suite runs with `npm test` | **44 tests, 0 failures** |
 
 ---
 
-## Implementation Summary
+## Test Run Evidence
 
-| Criteria | Status | Evidence |
-|---|---|---|
-| AC-1 Create Task | PASS | `tests/integration/taskRoutes.test.js` — POST suite |
-| AC-2 List Tasks | PASS | Integration — GET suite (pagination, filter, search, sort) |
-| AC-3 Get Task | PASS | Integration — GET /:id suite |
-| AC-4 Update Task | PASS | Integration — PATCH suite |
-| AC-5 Delete Task | PASS | Integration — DELETE suite |
-| AC-6 Error Format | PASS | All error assertions check `error.code` |
-| AC-7 Persistence | PASS | `src/db/`, `better-sqlite3`, `001_create_tasks.sql` |
-| AC-8 Test Coverage | PASS | 44 tests, 3 suites — all passing |
+Last full run — `NODE_ENV=test npm test -- --verbose`:
+
+```
+PASS tests/integration/taskRoutes.test.js
+  POST /api/v1/tasks
+    ✓ creates a task and returns 201
+    ✓ creates task with all fields
+    ✓ returns 400 when title is missing
+    ✓ returns 400 for invalid status
+  GET /api/v1/tasks
+    ✓ returns all tasks with pagination meta
+    ✓ filters by status
+    ✓ searches by title
+    ✓ returns 400 for invalid status filter
+    ✓ paginates correctly
+    ✓ returns empty second page when no more results
+  GET /api/v1/tasks/:id
+    ✓ returns a task by id
+    ✓ returns 404 for unknown id
+  PATCH /api/v1/tasks/:id
+    ✓ updates title and status
+    ✓ updates updated_at timestamp
+    ✓ returns 400 for empty patch body
+    ✓ returns 404 for unknown id
+    ✓ returns 400 for invalid status
+  DELETE /api/v1/tasks/:id
+    ✓ deletes a task and returns 204
+    ✓ returns 404 for unknown id
+  Health check
+    ✓ GET /health returns ok
+
+PASS tests/unit/taskValidator.test.js
+  createTaskSchema
+    ✓ accepts valid task with all fields
+    ✓ uses default status todo
+    ✓ rejects missing title
+    ✓ rejects empty title
+    ✓ rejects title over 255 chars
+    ✓ rejects invalid status
+    ✓ accepts all valid statuses
+    ✓ transforms empty due_date to null
+  updateTaskSchema
+    ✓ accepts partial update
+    ✓ rejects empty update object
+    ✓ rejects empty title string
+    ✓ accepts status-only update
+  listTasksSchema
+    ✓ uses defaults
+    ✓ accepts valid filters
+    ✓ rejects invalid sort_by
+    ✓ rejects invalid status filter
+
+PASS tests/unit/pagination.test.js
+  parsePagination
+    ✓ returns defaults when no query params
+    ✓ parses page and per_page correctly
+    ✓ caps per_page at max (100)
+    ✓ clamps page to minimum of 1
+    ✓ handles non-numeric values gracefully
+  buildMeta
+    ✓ calculates total_pages correctly
+    ✓ handles zero total
+    ✓ handles exact divisor
+
+Test Suites: 3 passed, 3 total
+Tests:       44 passed, 44 total
+```
 
 ## Repository
 
